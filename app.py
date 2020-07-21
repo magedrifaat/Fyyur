@@ -46,6 +46,8 @@ class Venue(db.Model):
     seeking_talent = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.String())
 
+    shows = db.relationship('Show', backref='venue', cascade="all, delete-orphan")
+
 class Artist(db.Model):
     __tablename__ = 'Artist'
 
@@ -63,7 +65,18 @@ class Artist(db.Model):
     seeking_venue = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.String())
 
+    shows = db.relationship('Show', backref='artist', cascade="all, delete-orphan")
+
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+# Implementing Show model as an association object since it is basically an association table with an extra field
+# This is per SQLAlchey documentation here: https://docs.sqlalchemy.org/en/13/orm/basic_relationships.html#association-object
+class Show(db.Model):
+  __tablename__ = 'Show'
+
+  # Composite PK: artist.id, venue.id and show_time as an artist can have multiple shows at the same venue at different times
+  artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
+  venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
+  show_time = db.Column(db.DateTime(), primary_key=True)
 
 #----------------------------------------------------------------------------#
 # Filters.
