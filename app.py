@@ -14,7 +14,7 @@ from flask_wtf import Form
 from forms import *
 from flask_migrate import Migrate;
 
-import datetime
+from datetime import datetime
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -151,16 +151,18 @@ def venues():
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
-  # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
+  # TODO DONE: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
+  search_term = request.form.get('search_term', '')
+  matches = Venue.query.filter(Venue.name.ilike(f'%{search_term}%')).all()
   response={
-    "count": 1,
+    "count": len(matches),
     "data": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
+      "id": match.id,
+      "name": match.name,
+      "num_upcoming_shows": len([show for show in match.shows if show.show_time > datetime.now()]),
+    } for match in matches]
   }
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
@@ -172,7 +174,7 @@ def show_venue(venue_id):
   venue = Venue.query.get(venue_id)
   if venue:
     past_shows = [show for show in venue.shows if show.show_time < datetime.now()]
-    upcoming_shows = [show for show in venue.shows if show.show_time < datetime.now()]
+    upcoming_shows = [show for show in venue.shows if show.show_time > datetime.now()]
     data = {
       "id": venue.id,
       "name": venue.name,
@@ -189,13 +191,13 @@ def show_venue(venue_id):
         "artist_id": show.artist.id,
         "artist_name": show.artist.name,
         "artist_image_link": show.artist.image_link,
-        "start_time": show.start_time
+        "start_time": str(show.show_time)
       } for show in past_shows],
       "upcoming_shows": [{
         "artist_id": show.artist.id,
         "artist_name": show.artist.name,
         "artist_image_link": show.artist.image_link,
-        "start_time": show.start_time
+        "start_time": str(show.show_time)
       } for show in upcoming_shows],
       "past_shows_count": len(past_shows),
       "upcoming_shows_count": len(upcoming_shows)
@@ -298,7 +300,7 @@ def show_artist(artist_id):
   artist = Artist.query.get(artist_id)
   if artist:
     past_shows = [show for show in artist.shows if show.show_time < datetime.now()]
-    upcoming_shows = [show for show in artist.shows if show.show_time < datetime.now()]
+    upcoming_shows = [show for show in artist.shows if show.show_time > datetime.now()]
       
     data={
       "id": artist.id,
@@ -315,13 +317,13 @@ def show_artist(artist_id):
         "venue_id": show.venue_id,
         "venue_name": show.venue.name,
         "venue_image_link": show.venue.image_link,
-        "start_time": show.start_time
+        "start_time": str(show.show_time)
       } for show in past_shows],
       "upcoming_shows": [{
         "venue_id": show.venue_id,
         "venue_name": show.venue.name,
         "venue_image_link": show.venue.image_link,
-        "start_time": show.start_time
+        "start_time": str(show.show_time)
       } for show in upcoming_shows],
       "past_shows_count": len(past_shows),
       "upcoming_shows_count": len(upcoming_shows),
@@ -398,12 +400,31 @@ def create_artist_form():
 def create_artist_submission():
   # called upon submitting the new artist listing form
   # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
+  # TODO DONE: modify data to be the data object returned from db insertion
+  error = False
+  try:
+    artist = Artist(name = request.form.get('name', ''), 
+                    city = request.form.get('city', ''),
+                    state = request.form['state'],
+                    phone = request.form['phone'],
+                    facebook_link = request.form['facebook_link'],
+                    genres = ",".join(request.form.getlist('genres')))
+    db.session.add(artist)
+    db.session.commit()
+  except:
+    error = True
+    db.session.rollback()
+  finally:
+    db.session.close()
 
-  # on successful db insert, flash success
-  flash('Artist ' + request.form['name'] + ' was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+  if error:
+    # TODO DONE: on unsuccessful db insert, flash an error instead.
+    # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+    flash('An error occurred. Artist ' + request.form['name'] + ' could not be listed.', 'error')
+  else:
+    # on successful db insert, flash success
+    flash('Artist ' + request.form['name'] + ' was successfully listed!')
+  
   return render_template('pages/home.html')
 
 
@@ -451,6 +472,15 @@ def shows():
     "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
     "start_time": "2035-04-15T20:00:00.000Z"
   }]
+
+  data=[{
+    "venue_id": show.venue_id,
+    "venue_name": show.venue.name,
+    "artist_id": show.artist_id,
+    "artist_name": show.artist.name,
+    "artist_image_link": show.artist.image_link,
+    "start_time": str(show.show_time)
+  } for show in Show.query.all()]
   return render_template('pages/shows.html', shows=data)
 
 @app.route('/shows/create')
@@ -462,13 +492,29 @@ def create_shows():
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
-  # TODO: insert form data as a new Show record in the db, instead
+  # TODO DONE: insert form data as a new Show record in the db, instead
+  error = False
+  try:
+    show = Show(artist_id = request.form['artist_id'],
+                venue_id = request.form['venue_id'],
+                show_time = request.form['start_time'])
+    db.session.add(show)
+    db.session.commit()
+  except:
+    error = True
+    db.session.rollback()
+  finally:
+    db.session.close()
 
-  # on successful db insert, flash success
-  flash('Show was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Show could not be listed.')
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+  if error:
+    # TODO DONE: on unsuccessful db insert, flash an error instead.
+    # e.g., flash('An error occurred. Show could not be listed.')
+    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+    flash('An error occurred. Show could not be listed.', 'error')
+  else:
+    # on successful db insert, flash success
+    flash('Show was successfully listed!')
+  
   return render_template('pages/home.html')
 
 @app.errorhandler(404)
