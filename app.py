@@ -222,8 +222,8 @@ def create_venue_submission():
   # TODO DONE: insert form data as a new Venue record in the db, instead
   # TODO DONE: modify data to be the data object returned from db insertion
   
-  # Reinstantiate a form with the request data to validate.
-  form = VenueForm(request.form)
+  # Reinstantiate a form with the request data to validate, disable csrf to prevent csrf validation error.
+  form = VenueForm(request.form, csrf_enabled=False)
   if not form.validate_on_submit():
     return render_template('forms/new_venue.html', form=form)
   
@@ -412,8 +412,8 @@ def create_artist_submission():
   # TODO DONE: insert form data as a new Venue record in the db, instead
   # TODO DONE: modify data to be the data object returned from db insertion
 
-  # Reinstantiate a form with the request data to validate.
-  form = ArtistForm(request.form)
+  # Reinstantiate a form with the request data to validate, disable csrf to prevent csrf validation error.
+  form = ArtistForm(request.form, csrf_enabled=False)
   if not form.validate_on_submit():
     return render_template('forms/new_artist.html', form=form)
   
@@ -475,8 +475,8 @@ def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO DONE: insert form data as a new Show record in the db, instead
 
-  # Reinstantiate a form with the request data to validate.
-  form = ShowForm(request.form)
+  # Reinstantiate a form with the request data to validate, disable csrf to prevent csrf validation error.
+  form = ShowForm(request.form, csrf_enabled=False)
   if not form.validate_on_submit():
     return render_template('forms/new_show.html', form=form)
   
